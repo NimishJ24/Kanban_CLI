@@ -50,11 +50,29 @@ class AliasedGroup(DefaultGroup):
         # allow automatic abbreviation of the command.  "status" for
         # instance will match "st".  We only allow that however if
         # there is only one command.
-        matches = [x for x in self.list_commands(ctx)
-                   if x.lower().startswith(cmd_name.lower())]
-        if not matches:
-            return None
-        elif len(matches) == 1:
-            return click.Group.get_command(self, ctx, matches[0])
-        ctx.fail('Too many matches: %s' % ', '.join(sorted(matches)))
+        # matches = [x for x in self.list_commands(ctx)
+        #            if x.lower().startswith(cmd_name.lower())]
+        # if not matches:
+        #     return None
+        # elif len(matches) == 1:
+        #     return click.Group.get_command(self, ctx, matches[0])
+        # ctx.fail('Too many matches: %s' % ', '.join(sorted(matches)))
+
+def read_config(ctx, param, value):
+    """Callback that is used whenever --config is passed.  We use this to
+    always load the correct config.  This means that the config is loaded
+    even if the group itself never executes so our aliases stay always
+    available.
+    """
+    cfg = ctx.ensure_object(Config)
+    if value is None:
+        value = os.path.join(os.path.dirname(__file__), 'aliases.ini')
+    cfg.read_config(value)
+    return value
+
+
+# @click.version_option(VERSION)
+@click.command(cls=AliasedGroup, default='show', default_if_no_args=True)
+def kanbancli():
+    """kanbancli: CLI personal kanban """
 
