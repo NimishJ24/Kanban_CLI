@@ -21,5 +21,6 @@ setup(
     entry_points='''
         [console_scripts]
         kanbancli=kanbancli:kanbancli
+        alexa=kanbancli:kanbancli
     ''',
 )
