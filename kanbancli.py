@@ -116,7 +116,7 @@ def add(tasks,priority):
             click.echo('Task must be at most %s chars, Brevity counts: %s'
                        % (taskname_length, task))
         else:
-            todos, inprogs, dones = split_items(config, dd)
+            todos,plans, inprogs, dones = split_items(config, dd)
             if ('limits' in config and 'todo' in config['limits'] and
                     int(config['limits']['todo']) <= len(todos)):
                 click.echo('No new todos, limit reached already.')
@@ -166,7 +166,7 @@ def promote(ids):
     """Promote task"""
     config = read_config_yaml()
     dd = read_data(config)
-    todos, inprogs, dones = split_items(config, dd)
+    todos,plans, inprogs, dones = split_items(config, dd)
 
     for id in ids:
         try:
@@ -181,12 +181,15 @@ def promote(ids):
                         % config['limits']['wip']
                     )
                 else:
-                    click.echo('Promoting task %s to in-progress.' % id)
+                    click.echo('Promoting task %s to plan.' % id)
                     dd['data'][int(id)] = [
-                        'inprogress',
+                        'plan',
                         item[1], timestamp(),
                         item[3],item[4]
                     ]
+            elif item[0] == 'plan':
+                click.echo('Promoting task %s to in-progress.' % id)
+                dd['data'][int(id)] = ['inprogress', item[1], timestamp(), item[3],item[4]]
             elif item[0] == 'inprogress':
                 click.echo('Promoting task %s to done.' % id)
                 dd['data'][int(id)] = ['done', item[1], timestamp(), item[3],item[4]]
@@ -207,7 +210,7 @@ def regress(ids):
     config = read_config_yaml()
     dd = read_data(config)
 
-    todos, inprogs, dones = split_items(config, dd)
+    todos,plans, inprogs, dones = split_items(config, dd)
 
     for id in ids:
         item = dd['data'].get(int(id))
@@ -217,6 +220,9 @@ def regress(ids):
             click.echo('Regressing task %s to in-progress.' % id)
             dd['data'][int(id)] = ['inprogress', item[1], timestamp(), item[3],item[4]]
         elif item[0] == 'inprogress':
+            click.echo('Regressing task %s to plan.' % id)
+            dd['data'][int(id)] = ['plan', item[1], timestamp(), item[3],item[4]]
+        elif item[0] == 'plan':
             click.echo('Regressing task %s to todo.' % id)
             dd['data'][int(id)] = ['todo', item[1], timestamp(), item[3],item[4]]
         else:
@@ -239,13 +245,14 @@ def display():
     """Show tasks in kanbancli"""
     config = read_config_yaml()
     dd = read_data(config)
-    todos, inprogs, dones = split_items(config, dd)
+    todos,plans, inprogs, dones = split_items(config, dd)
     if 'limits' in config and 'done' in config['limits']:
         dones = dones[0:int(config['limits']['done'])]
     else:
         dones = dones[0:10]
 
     todos = '\n'.join([str(x) for x in todos])
+    plans = '\n'.join([str(x) for x in plans])
     inprogs = '\n'.join([str(x) for x in inprogs])
     dones = '\n'.join([str(x) for x in dones])
 
@@ -255,6 +262,7 @@ def display():
         no_wrap=True,
         footer="GDSC ROCKS"
     )
+    table.add_column('[bold blue]plan[/bold blue]', no_wrap=True)
     table.add_column('[bold green]in-progress[/bold green]', no_wrap=True)
     table.add_column(
         '[bold magenta]done[/bold magenta]',
@@ -262,7 +270,7 @@ def display():
         # footer="v.{}".format(VERSION)
     )
 
-    table.add_row(todos, inprogs, dones)
+    table.add_row(todos,plans, inprogs, dones)
     console.print(table)
 
 
@@ -292,6 +300,7 @@ def write_data(config, data):
 
 def split_items(config, dd):
     todos = []
+    plans=[]
     inprogs = []
     dones = []
 
@@ -300,12 +309,14 @@ def split_items(config, dd):
     for key, value in sorted_data:
         if value[0] == 'todo':
             todos.append("[%d] %s" % (key, value[1]))
+        elif value[0] == 'plan':
+            plans.append("[%d] %s" % (key, value[1]))
         elif value[0] == 'inprogress':
             inprogs.append("[%d] %s" % (key, value[1]))
         else:
             dones.insert(0, "[%d] %s" % (key, value[1]))
 
-    return todos, inprogs, dones
+    return todos,plans, inprogs, dones
 
 
 def read_config_yaml():
