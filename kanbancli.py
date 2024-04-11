@@ -100,8 +100,9 @@ PRIORITY_MAP = {
 }
 @kanbancli.command()
 @click.argument('tasks',nargs=-1) # the number of command-line arguments that should be read
+@click.option('--name', '-n', help='Name of the Table', required=True)
 @click.option('--priority', type=click.Choice(['high', 'medium', 'low']), default='medium', help='Priority of the task' )
-def add(tasks,priority):
+def add(tasks,priority,name):
     """Add a tasks in todo"""
     config = read_config_yaml()
     dd = read_data(config)
@@ -125,7 +126,7 @@ def add(tasks,priority):
                 new_id = 1        
                 if bool(od):
                     new_id = next(reversed(od)) + 1
-                entry = ['todo', task, timestamp(), timestamp(),PRIORITY_MAP[priority]]
+                entry = ['todo', task, timestamp(), timestamp(),PRIORITY_MAP[priority],name]
                 dd['data'].update({new_id: entry})
                 click.echo("Creating new task w/ id: %d -> %s"
                            % (new_id, task))
@@ -185,14 +186,14 @@ def promote(ids):
                     dd['data'][int(id)] = [
                         'plan',
                         item[1], timestamp(),
-                        item[3],item[4]
+                        item[3],item[4],item[5]
                     ]
             elif item[0] == 'plan':
                 click.echo('Promoting task %s to in-progress.' % id)
-                dd['data'][int(id)] = ['inprogress', item[1], timestamp(), item[3],item[4]]
+                dd['data'][int(id)] = ['inprogress', item[1], timestamp(), item[3],item[4],item[5]]
             elif item[0] == 'inprogress':
                 click.echo('Promoting task %s to done.' % id)
-                dd['data'][int(id)] = ['done', item[1], timestamp(), item[3],item[4]]
+                dd['data'][int(id)] = ['done', item[1], timestamp(), item[3],item[4],item[5]]
             else:
                 click.echo('Can not promote %s, already done.' % id)
         except ValueError:
@@ -218,13 +219,13 @@ def regress(ids):
             click.echo('No existing task with id: %s' % id)
         elif item[0] == 'done':
             click.echo('Regressing task %s to in-progress.' % id)
-            dd['data'][int(id)] = ['inprogress', item[1], timestamp(), item[3],item[4]]
+            dd['data'][int(id)] = ['inprogress', item[1], timestamp(), item[3],item[4],item[5]]
         elif item[0] == 'inprogress':
             click.echo('Regressing task %s to plan.' % id)
-            dd['data'][int(id)] = ['plan', item[1], timestamp(), item[3],item[4]]
+            dd['data'][int(id)] = ['plan', item[1], timestamp(), item[3],item[4],item[5]]
         elif item[0] == 'plan':
             click.echo('Regressing task %s to todo.' % id)
-            dd['data'][int(id)] = ['todo', item[1], timestamp(), item[3],item[4]]
+            dd['data'][int(id)] = ['todo', item[1], timestamp(), item[3],item[4],item[5]]
         else:
             click.echo('Already in todo, can not regress %s' % id)
 
@@ -233,8 +234,63 @@ def regress(ids):
         display()
 
 @kanbancli.command()
-def show():
-    display()
+@click.option('--name', '-n', help='Name of the Table', required=True)
+def show(name):
+    console = Console()
+    """Show tasks in kanbancli"""
+    config = read_config_yaml()
+    dd = read_data(config)
+    todos,plans, inprogs, dones = split_items(config, dd)
+    if 'limits' in config and 'done' in config['limits']:
+        dones = dones[0:int(config['limits']['done'])]
+    else:
+        dones = dones[0:10]
+
+    # todos = '\n'.join([str(x) for x in todos])
+    # plans = '\n'.join([str(x) for x in plans])
+    # inprogs = '\n'.join([str(x) for x in inprogs])
+    # dones = '\n'.join([str(x) for x in dones])
+    # Filter data based on the name argument
+    sorted_data = sorted(dd['data'].items(), key=lambda item: item[1][4])
+    filtered_data = [item for item in sorted_data if item[1][5] == name]  # Assuming 6th element is at index 5
+
+    # Prepare task lists based on filtered data
+    filtered_todos = []
+    filtered_plans = []
+    filtered_inprogs = []
+    filtered_dones = []
+    for key, value in filtered_data:
+        if value[0] == 'todo':
+            filtered_todos.append("[%d] %s" % (key, value[1]))
+        elif value[0] == 'plan':
+            filtered_plans.append("[%d] %s" % (key, value[1]))
+        elif value[0] == 'inprogress':
+            filtered_inprogs.append("[%d] %s" % (key, value[1]))
+        else:
+            filtered_dones.insert(0, "[%d] %s" % (key, value[1]))
+
+    todos = '\n'.join([str(x) for x in filtered_todos])
+    plans = '\n'.join([str(x) for x in filtered_plans])
+    inprogs = '\n'.join([str(x) for x in filtered_inprogs])
+    dones = '\n'.join([str(x) for x in filtered_dones])
+
+    table = Table(show_header=True, show_footer=True)
+    table.add_column(
+        "[bold yellow]todo[/bold yellow]",
+        no_wrap=True,
+        footer=name
+    )
+    table.add_column('[bold blue]plan[/bold blue]', no_wrap=True)
+    table.add_column('[bold green]in-progress[/bold green]', no_wrap=True)
+    table.add_column(
+        '[bold magenta]done[/bold magenta]',
+        no_wrap=True,
+        # footer="v.{}".format(VERSION)
+    )
+
+    table.add_row(todos,plans, inprogs, dones)
+    console.print(table)
+
 
 
 #FUNCTIONS USED ABOVE :
