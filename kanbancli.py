@@ -93,10 +93,15 @@ def configure():
         yaml.dump(conf, outfile, default_flow_style=False)
     click.echo("Creating %s" % config_path)
 
-
+PRIORITY_MAP = {
+    'high': 1,
+    'medium': 2,
+    'low': 3
+}
 @kanbancli.command()
-@click.argument('tasks', nargs=-1) # the number of command-line arguments that should be read
-def add(tasks):
+@click.argument('tasks',nargs=-1) # the number of command-line arguments that should be read
+@click.option('--priority', type=click.Choice(['high', 'medium', 'low']), default='medium', help='Priority of the task' )
+def add(tasks,priority):
     """Add a tasks in todo"""
     config = read_config_yaml()
     dd = read_data(config)
@@ -120,7 +125,7 @@ def add(tasks):
                 new_id = 1        
                 if bool(od):
                     new_id = next(reversed(od)) + 1
-                entry = ['todo', task, timestamp(), timestamp()]
+                entry = ['todo', task, timestamp(), timestamp(),PRIORITY_MAP[priority]]
                 dd['data'].update({new_id: entry})
                 click.echo("Creating new task w/ id: %d -> %s"
                            % (new_id, task))
@@ -180,11 +185,11 @@ def promote(ids):
                     dd['data'][int(id)] = [
                         'inprogress',
                         item[1], timestamp(),
-                        item[3]
+                        item[3],item[4]
                     ]
             elif item[0] == 'inprogress':
                 click.echo('Promoting task %s to done.' % id)
-                dd['data'][int(id)] = ['done', item[1], timestamp(), item[3]]
+                dd['data'][int(id)] = ['done', item[1], timestamp(), item[3],item[4]]
             else:
                 click.echo('Can not promote %s, already done.' % id)
         except ValueError:
@@ -210,10 +215,10 @@ def regress(ids):
             click.echo('No existing task with id: %s' % id)
         elif item[0] == 'done':
             click.echo('Regressing task %s to in-progress.' % id)
-            dd['data'][int(id)] = ['inprogress', item[1], timestamp(), item[3]]
+            dd['data'][int(id)] = ['inprogress', item[1], timestamp(), item[3],item[4]]
         elif item[0] == 'inprogress':
             click.echo('Regressing task %s to todo.' % id)
-            dd['data'][int(id)] = ['todo', item[1], timestamp(), item[3]]
+            dd['data'][int(id)] = ['todo', item[1], timestamp(), item[3],item[4]]
         else:
             click.echo('Already in todo, can not regress %s' % id)
 
@@ -231,7 +236,7 @@ def show():
 
 def display():
     console = Console()
-    """Show tasks in clikan"""
+    """Show tasks in kanbancli"""
     config = read_config_yaml()
     dd = read_data(config)
     todos, inprogs, dones = split_items(config, dd)
@@ -290,7 +295,9 @@ def split_items(config, dd):
     inprogs = []
     dones = []
 
-    for key, value in dd['data'].items():
+    sorted_data = sorted(dd['data'].items(), key=lambda item: item[1][4])
+
+    for key, value in sorted_data:
         if value[0] == 'todo':
             todos.append("[%d] %s" % (key, value[1]))
         elif value[0] == 'inprogress':
