@@ -38,16 +38,14 @@ class AliasedGroup(DefaultGroup):
     """
 
     def get_command(self, ctx, cmd_name):
-        # Step one: bulitin commands as normal
-        rv = click.Group.get_command(self, ctx, cmd_name)
+        rv = click.Group.get_command(self, ctx, cmd_name)#click context obeject , command name
         if rv is not None:
             return rv
 
-        # Step two: find the config object and ensure it's there.  This
-        # will create the config object is missing.
+        # find the config object and ensure it's there.
+        # This will create the config object is missing.
         cfg = ctx.ensure_object(Config)
 
-        # Step three: lookup an explicit command aliase in the config
         if cmd_name in cfg.aliases:
             actual_cmd = cfg.aliases[cmd_name]
             return click.Group.get_command(self, ctx, actual_cmd)
@@ -72,8 +70,6 @@ def read_config(ctx, param, value):
     cfg.read_config(value)
     return value
 
-
-# @click.version_option(VERSION)
 @click.command(cls=AliasedGroup, default='show', default_if_no_args=True)
 def kanbancli():
     """kanbancli: CLI personal kanban """
@@ -225,12 +221,7 @@ def show(name):
     """Show tasks in kanbancli"""
     config = read_config_yaml()
     dd = read_data(config)
-    todos,plans, inprogs, dones = split_items(config, dd)
-    if 'limits' in config and 'done' in config['limits']:
-        dones = dones[0:int(config['limits']['done'])]
-    else:
-        dones = dones[0:10]
-
+   
     sorted_data = sorted(dd['data'].items(), key=lambda item: item[1][4])
     filtered_data = [item for item in sorted_data if item[1][5] == name]  # Assuming 6th element is at index 5
 
@@ -249,12 +240,17 @@ def show(name):
         else:
             filtered_dones.insert(0, "[%d] %s" % (key, value[1]))
 
+    if 'limits' in config and 'done' in config['limits']:
+        filtered_dones = filtered_dones[0:int(config['limits']['done'])]
+    else:
+        filtered_dones = filtered_dones[0:10]
+
     todos = '\n'.join([str(x) for x in filtered_todos])
     plans = '\n'.join([str(x) for x in filtered_plans])
     inprogs = '\n'.join([str(x) for x in filtered_inprogs])
     dones = '\n'.join([str(x) for x in filtered_dones])
 
-    table = Table(show_header=True, show_footer=True)
+    table = Table(show_header=True, show_footer=True , title ="Your personal Kanban | {}".format(name) )
     table.add_column(
         "[bold yellow]todo[/bold yellow]",
         no_wrap=True,
